@@ -2,12 +2,15 @@ name: '[Scraper] Run Every Hour'
 
 on:
   schedule:
-    - cron: '0 * * * *' # Runs at the start of every hour
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,11 +35,15 @@ jobs:
           git commit -m "Update plate data (Hourly schedule)" || exit 0
           git push
 
-      - name: Check for 3-Minute Trigger
-        if: success() && file.exists('trigger_3_minutes.txt')
+      # --- CORRECTED BLOCK ---
+      - name: Check and Trigger 3-Minute Workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Final 30 minutes detected. Switching to 3-minute workflow."
-          gh workflow disable every-hour.yml
-          gh workflow enable every-3-minutes.yml
+          if [ -f "trigger_3_minutes.txt" ]; then
+            echo "Final 30 minutes detected. Switching to 3-minute workflow."
+            gh workflow disable 'every-hour.yml'
+            gh workflow enable 'every-3-minutes.yml'
+          else
+            echo "Not in the final 30 minutes yet."
+          fi
