@@ -2,23 +2,24 @@ name: '[Scraper] Run Every 6 Hours'
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Runs at 00:00, 06:00, 12:00, 18:00 UTC
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write # Required to enable/disable other workflows
+      contents: write # Required to commit the CSV file
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python and Dependencies
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
+      - run: |
           pip install selenium webdriver-manager
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
@@ -34,11 +35,15 @@ jobs:
           git commit -m "Update plate data (6-hour schedule)" || exit 0
           git push
 
-      - name: Check for Hourly Trigger
-        if: success() && file.exists('trigger_hourly.txt')
+      # --- CORRECTED BLOCK ---
+      - name: Check and Trigger Hourly Workflow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Last day detected. Switching to hourly workflow."
-          gh workflow disable every-6-hours.yml
-          gh workflow enable every-hour.yml
+          if [ -f "trigger_hourly.txt" ]; then
+            echo "Last day detected. Switching to hourly workflow."
+            gh workflow disable 'every-6-hours.yml'
+            gh workflow enable 'every-hour.yml'
+          else
+            echo "Not the last day yet. No change in schedule."
+          fi
