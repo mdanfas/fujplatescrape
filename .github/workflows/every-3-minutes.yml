@@ -2,12 +2,15 @@ name: '[Scraper] Run Every 3 Minutes'
 
 on:
   schedule:
-    - cron: '*/3 * * * *' # Runs every 3 minutes
+    - cron: '*/3 * * * *'
   workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,10 +35,14 @@ jobs:
           git commit -m "Update plate data (3-minute schedule)" || exit 0
           git push
       
+      # --- CORRECTED BLOCK ---
       - name: Check for Stop Trigger
-        if: success() && file.exists('trigger_stop.txt')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "All plates are gone. Disabling final workflow."
-          gh workflow disable every-3-minutes.yml
+          if [ -f "trigger_stop.txt" ]; then
+            echo "All plates are gone. Disabling final workflow."
+            gh workflow disable 'every-3-minutes.yml'
+          else
+            echo "Plates are still active."
+          fi
